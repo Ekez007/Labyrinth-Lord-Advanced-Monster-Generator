@@ -188,7 +188,7 @@ class AdvancedMonsterGenerator:
             # Combine treasures
             treasure = TreasureGenerator.generate_lair_treasure(monster_data["challengeRating"], monster_data["type"])
         else:
-            from ..models.monster import TreasureInfo
+            from models.monster import TreasureInfo
             treasure = TreasureInfo(individual="None", lair="None")
         
         # Generate lair
