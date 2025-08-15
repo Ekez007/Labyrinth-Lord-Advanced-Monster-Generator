@@ -234,14 +234,23 @@ class AdvancedMonsterGenerator:
         
         # Generate HP from HD
         hd_string = base_stats['hd']
-        if hd_string == '1-1':
-            hp = max(1, random.randint(1, 8) - 1)
-        elif '+' in hd_string:
-            dice, bonus = hd_string.split('+')
-            hp = sum(random.randint(1, 8) for _ in range(int(dice))) + int(bonus)
-        else:
-            dice = int(hd_string) if hd_string.isdigit() else 1
-            hp = sum(random.randint(1, 8) for _ in range(dice))
+        try:
+            if hd_string == '1-1':
+                hp = max(1, random.randint(1, 8) - 1)
+            elif '+' in hd_string:
+                dice, bonus = hd_string.split('+')
+                dice = dice.strip()
+                bonus = bonus.strip()
+                if dice and bonus:
+                    hp = sum(random.randint(1, 8) for _ in range(int(dice))) + int(bonus)
+                else:
+                    hp = random.randint(1, 8)  # fallback
+            else:
+                dice = int(hd_string) if hd_string.isdigit() else 1
+                hp = sum(random.randint(1, 8) for _ in range(dice))
+        except (ValueError, AttributeError):
+            # Fallback for any parsing errors
+            hp = random.randint(1, 8)
         
         # Generate movement
         base_move = random.choice([60, 90, 120, 150])
