@@ -1,6 +1,6 @@
 import random
 from typing import Tuple
-from ..models.monster import EncounterInfo
+from models.monster import EncounterInfo
 
 class EncounterGenerator:
     
