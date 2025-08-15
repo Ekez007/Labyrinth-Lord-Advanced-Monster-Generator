@@ -1,6 +1,6 @@
 import random
 from typing import Dict, List, Tuple
-from ..models.monster import TreasureInfo
+from models.monster import TreasureInfo
 
 class TreasureGenerator:
     
