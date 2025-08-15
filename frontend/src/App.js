@@ -1,75 +1,281 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import "./App.css";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import MonsterCard from "./components/MonsterCard";
 import GenerationControls from "./components/GenerationControls";
 import SavedMonsters from "./components/SavedMonsters";
-import { generateMonsters } from "./utils/monsterGenerator";
+import MonsterAPI from "./services/monsterApi";
 import { Toaster } from "./components/ui/toaster";
 import { useToast } from "./hooks/use-toast";
-import { Skull, Github, ExternalLink } from "lucide-react";
+import { Alert, AlertDescription } from "./components/ui/alert";
+import { Skull, Github, ExternalLink, AlertCircle, Wifi, WifiOff } from "lucide-react";
 
 const Home = () => {
   const [generatedMonsters, setGeneratedMonsters] = useState([]);
   const [savedMonsters, setSavedMonsters] = useState([]);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isConnected, setIsConnected] = useState(true);
+  const [stats, setStats] = useState({ totalGenerated: 0, totalSaved: 0, totalShared: 0 });
   const { toast } = useToast();
 
-  const handleGenerate = async (filters) => {
+  // Test API connection on startup
+  useEffect(() => {
+    const testConnection = async () => {
+      try {
+        await MonsterAPI.testConnection();
+        setIsConnected(true);
+        // Load initial data
+        await loadSavedMonsters();
+        await loadStats();
+      } catch (error) {
+        console.error('API connection failed:', error);
+        setIsConnected(false);
+        toast({
+          title: "API Connection Failed",
+          description: "Using offline mode. Some features may be limited.",
+          variant: "destructive",
+        });
+      }
+    };
+
+    testConnection();
+  }, [toast]);
+
+  const loadSavedMonsters = async () => {
+    if (!isConnected) return;
+    
+    try {
+      const data = await MonsterAPI.getMyCollection();
+      setSavedMonsters(data.monsters || []);
+    } catch (error) {
+      console.error('Failed to load saved monsters:', error);
+    }
+  };
+
+  const loadStats = async () => {
+    if (!isConnected) return;
+    
+    try {
+      const data = await MonsterAPI.getStats();
+      setStats(data);
+    } catch (error) {
+      console.error('Failed to load stats:', error);
+    }
+  };
+
+  const handleGenerate = async (request) => {
     setIsGenerating(true);
     
-    // Simulate generation delay for better UX
-    setTimeout(() => {
-      const monsters = generateMonsters(filters);
-      setGeneratedMonsters(monsters);
-      setIsGenerating(false);
+    try {
+      const data = await MonsterAPI.generateMonsters(request);
+      setGeneratedMonsters(data.monsters || []);
+      
+      // Update stats
+      await loadStats();
       
       toast({
         title: "Monsters generated!",
-        description: `Generated ${monsters.length} monster${monsters.length > 1 ? 's' : ''} successfully.`,
+        description: `Generated ${data.monsters?.length || 0} monster${data.monsters?.length !== 1 ? 's' : ''} successfully.`,
       });
-    }, 800);
+    } catch (error) {
+      console.error('Generation failed:', error);
+      toast({
+        title: "Generation failed",
+        description: error.message || "Failed to generate monsters. Please try again.",
+        variant: "destructive",
+      });
+      
+      // Fallback to mock generation in offline mode
+      if (!isConnected) {
+        generateMockMonster(request);
+      }
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
-  const handleSaveMonster = (monster) => {
-    const isDuplicate = savedMonsters.some(saved => 
-      saved.name === monster.name && saved.type === monster.type
-    );
-    
-    if (!isDuplicate) {
-      setSavedMonsters(prev => [...prev, monster]);
+  // Fallback mock generation for offline mode
+  const generateMockMonster = (request) => {
+    const mockMonster = {
+      id: `mock-${Date.now()}`,
+      name: "Offline Test Monster",
+      type: request.filters.type !== 'any' ? request.filters.type : 'beast',
+      challengeRating: request.filters.challengeRating !== 'any' ? request.filters.challengeRating : '1',
+      environment: request.filters.environment !== 'any' ? request.filters.environment : 'dungeon',
+      stats: {
+        ac: 6,
+        hd: "1",
+        hp: 4,
+        movement: "90' (30')",
+        attacks: "1 bite",
+        damage: "1d6",
+        save: "Fighter 1",
+        morale: 7,
+        xp: 10
+      },
+      description: "This is a test monster generated in offline mode.",
+      specialAbilities: ["Test Ability"],
+      encounters: {
+        numberAppearing: "1d4",
+        wildEncounter: "1d2",
+        lairChance: 25
+      },
+      treasure: {
+        individual: "None",
+        lair: "None",
+        coins: {},
+        gems: [],
+        magicItems: []
+      },
+      lair: {
+        description: "A simple den in the rocks.",
+        terrain: request.filters.environment !== 'any' ? request.filters.environment : 'dungeon',
+        size: "small",
+        defenses: ["Hidden entrance"],
+        features: ["Rocky outcropping"]
+      },
+      source: "mock"
+    };
+
+    setGeneratedMonsters([mockMonster]);
+    toast({
+      title: "Offline mode",
+      description: "Generated test monster. Connect to API for full features.",
+      variant: "default",
+    });
+  };
+
+  const handleSaveMonster = async (monster) => {
+    if (!isConnected) {
       toast({
-        title: "Monster saved!",
-        description: `${monster.name} has been added to your collection.`,
+        title: "Offline mode",
+        description: "Cannot save monsters while offline.",
+        variant: "destructive",
       });
-    } else {
+      return;
+    }
+
+    try {
+      const isDuplicate = savedMonsters.some(saved => 
+        saved.name === monster.name && saved.type === monster.type
+      );
+      
+      if (!isDuplicate) {
+        const result = await MonsterAPI.saveMonster(monster);
+        
+        // Add the saved monster ID to the monster object
+        const savedMonster = { ...monster, id: result.monsterId };
+        setSavedMonsters(prev => [...prev, savedMonster]);
+        
+        // Update stats
+        await loadStats();
+        
+        toast({
+          title: "Monster saved!",
+          description: `${monster.name} has been added to your collection.`,
+        });
+      } else {
+        toast({
+          title: "Monster already saved",
+          description: `${monster.name} is already in your collection.`,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Failed to save monster:', error);
       toast({
-        title: "Monster already saved",
-        description: `${monster.name} is already in your collection.`,
+        title: "Save failed",
+        description: error.message || "Failed to save monster. Please try again.",
         variant: "destructive",
       });
     }
   };
 
-  const handleRemoveSaved = (index) => {
+  const handleRemoveSaved = async (index) => {
     const monster = savedMonsters[index];
-    setSavedMonsters(prev => prev.filter((_, i) => i !== index));
-    toast({
-      title: "Monster removed",
-      description: `${monster.name} has been removed from your collection.`,
-    });
+    
+    if (!isConnected) {
+      toast({
+        title: "Offline mode",
+        description: "Cannot delete monsters while offline.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      if (monster.id) {
+        await MonsterAPI.deleteSavedMonster(monster.id);
+      }
+      
+      setSavedMonsters(prev => prev.filter((_, i) => i !== index));
+      
+      // Update stats
+      await loadStats();
+      
+      toast({
+        title: "Monster removed",
+        description: `${monster.name} has been removed from your collection.`,
+      });
+    } catch (error) {
+      console.error('Failed to delete monster:', error);
+      toast({
+        title: "Delete failed",
+        description: error.message || "Failed to delete monster.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleClearAll = () => {
-    setSavedMonsters([]);
-    toast({
-      title: "Collection cleared",
-      description: "All saved monsters have been removed.",
-    });
+  const handleClearAll = async () => {
+    if (!isConnected) {
+      toast({
+        title: "Offline mode",
+        description: "Cannot clear collection while offline.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // Delete all saved monsters
+      await Promise.all(
+        savedMonsters
+          .filter(monster => monster.id)
+          .map(monster => MonsterAPI.deleteSavedMonster(monster.id))
+      );
+      
+      setSavedMonsters([]);
+      
+      // Update stats
+      await loadStats();
+      
+      toast({
+        title: "Collection cleared",
+        description: "All saved monsters have been removed.",
+      });
+    } catch (error) {
+      console.error('Failed to clear collection:', error);
+      toast({
+        title: "Clear failed",
+        description: error.message || "Failed to clear collection.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+      {/* Connection Status Alert */}
+      {!isConnected && (
+        <Alert className="mx-4 mt-4 border-orange-200 bg-orange-50">
+          <WifiOff className="h-4 w-4 text-orange-600" />
+          <AlertDescription className="text-orange-800">
+            API connection lost. Running in offline mode with limited functionality.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Header */}
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -82,8 +288,13 @@ const Home = () => {
                 <h1 className="text-3xl font-bold text-slate-900">
                   Labyrinth Lord Monster Generator
                 </h1>
-                <p className="text-slate-600 mt-1">
+                <p className="text-slate-600 mt-1 flex items-center gap-2">
                   Generate unique monsters for your old-school adventures
+                  {isConnected ? (
+                    <Wifi className="w-4 h-4 text-green-600" title="Connected" />
+                  ) : (
+                    <WifiOff className="w-4 h-4 text-orange-600" title="Offline" />
+                  )}
                 </p>
               </div>
             </div>
@@ -97,6 +308,15 @@ const Home = () => {
               <ExternalLink className="w-4 h-4" />
             </a>
           </div>
+          
+          {/* Stats Bar */}
+          {isConnected && (
+            <div className="mt-4 flex gap-6 text-sm text-slate-600">
+              <div>Generated: <span className="font-semibold text-emerald-600">{stats.totalGenerated}</span></div>
+              <div>Saved: <span className="font-semibold text-blue-600">{stats.totalSaved}</span></div>
+              <div>Shared: <span className="font-semibold text-purple-600">{stats.totalShared}</span></div>
+            </div>
+          )}
         </div>
       </header>
 
@@ -139,6 +359,7 @@ const Home = () => {
                       key={`${monster.name}-${index}`}
                       monster={monster}
                       onSave={handleSaveMonster}
+                      showAdvanced={true}
                     />
                   ))}
                 </div>
@@ -163,8 +384,14 @@ const Home = () => {
               Built for Labyrinth Lord RPG • Generate endless monsters for your campaigns
             </p>
             <p className="text-slate-400 text-xs mt-2">
-              Stats are based on Labyrinth Lord rules and compatible with most OSR systems
+              Features advanced generation algorithms with treasure, lair, and encounter systems
             </p>
+            {!isConnected && (
+              <p className="text-orange-500 text-xs mt-1 flex items-center justify-center gap-1">
+                <AlertCircle className="w-3 h-3" />
+                Some features require API connection
+              </p>
+            )}
           </div>
         </footer>
       </main>
