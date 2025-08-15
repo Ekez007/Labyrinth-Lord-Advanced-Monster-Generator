@@ -3,10 +3,10 @@ import uuid
 from typing import List, Dict, Any
 from datetime import datetime
 
-from ..models.monster import Monster, MonsterStats, AdvancedGenerationRequest
-from .treasure_generator import TreasureGenerator
-from .lair_generator import LairGenerator  
-from .encounter_generator import EncounterGenerator
+from models.monster import Monster, MonsterStats, AdvancedGenerationRequest
+from services.treasure_generator import TreasureGenerator
+from services.lair_generator import LairGenerator  
+from services.encounter_generator import EncounterGenerator
 
 class AdvancedMonsterGenerator:
     
