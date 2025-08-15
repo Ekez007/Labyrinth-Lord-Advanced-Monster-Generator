@@ -87,7 +87,15 @@ async def get_libraries():
             await db.monster_libraries.insert_one(default_library.dict())
             public_libraries = [default_library]
         
-        return {"libraries": [MonsterLibrary(**lib) for lib in public_libraries]}
+        # Convert to MonsterLibrary objects if they're dicts, otherwise use as-is
+        libraries = []
+        for lib in public_libraries:
+            if isinstance(lib, dict):
+                libraries.append(MonsterLibrary(**lib))
+            else:
+                libraries.append(lib)
+        
+        return {"libraries": libraries}
         
     except Exception as e:
         logger.error(f"Error fetching libraries: {str(e)}")
