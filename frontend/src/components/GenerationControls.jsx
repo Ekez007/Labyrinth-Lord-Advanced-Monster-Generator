@@ -4,8 +4,10 @@ import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
+import { Switch } from './ui/switch';
 import { Separator } from './ui/separator';
-import { Dice6, Shuffle, Zap } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
+import { Dice6, Shuffle, Zap, Settings, ChevronDown, ChevronUp, Coins, Home } from 'lucide-react';
 
 const GenerationControls = ({ onGenerate, isGenerating }) => {
   const [filters, setFilters] = useState({
@@ -14,6 +16,16 @@ const GenerationControls = ({ onGenerate, isGenerating }) => {
     environment: 'any',
     count: 1
   });
+
+  const [advancedSettings, setAdvancedSettings] = useState({
+    algorithm: 'balanced',
+    complexity: 'moderate',
+    includeTreasure: true,
+    includeLair: true,
+    customRules: {}
+  });
+
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const challengeRatings = [
     { value: 'any', label: 'Any CR' },
@@ -54,6 +66,18 @@ const GenerationControls = ({ onGenerate, isGenerating }) => {
     { value: 'planar', label: 'Planar' }
   ];
 
+  const algorithms = [
+    { value: 'balanced', label: 'Balanced', description: '70% templates, 30% random' },
+    { value: 'template-based', label: 'Template-Based', description: 'Based on existing monsters' },
+    { value: 'random', label: 'Random', description: 'Completely procedural' }
+  ];
+
+  const complexityLevels = [
+    { value: 'simple', label: 'Simple', description: 'Basic stats and abilities' },
+    { value: 'moderate', label: 'Moderate', description: 'Standard complexity' },
+    { value: 'complex', label: 'Complex', description: 'Advanced features and abilities' }
+  ];
+
   const handleFilterChange = (key, value) => {
     setFilters(prev => ({
       ...prev,
@@ -61,8 +85,19 @@ const GenerationControls = ({ onGenerate, isGenerating }) => {
     }));
   };
 
+  const handleAdvancedChange = (key, value) => {
+    setAdvancedSettings(prev => ({
+      ...prev,
+      [key]: value
+    }));
+  };
+
   const handleGenerate = () => {
-    onGenerate(filters);
+    const request = {
+      filters,
+      ...advancedSettings
+    };
+    onGenerate(request);
   };
 
   const handleRandomAll = () => {
@@ -72,8 +107,23 @@ const GenerationControls = ({ onGenerate, isGenerating }) => {
       environment: environments[Math.floor(Math.random() * environments.length)].value,
       count: Math.floor(Math.random() * 3) + 1
     };
+    
+    const randomAdvanced = {
+      algorithm: algorithms[Math.floor(Math.random() * algorithms.length)].value,
+      complexity: complexityLevels[Math.floor(Math.random() * complexityLevels.length)].value,
+      includeTreasure: Math.random() > 0.3,
+      includeLair: Math.random() > 0.3,
+      customRules: {}
+    };
+
     setFilters(randomFilters);
-    onGenerate(randomFilters);
+    setAdvancedSettings(randomAdvanced);
+    
+    const request = {
+      filters: randomFilters,
+      ...randomAdvanced
+    };
+    onGenerate(request);
   };
 
   return (
@@ -86,6 +136,7 @@ const GenerationControls = ({ onGenerate, isGenerating }) => {
       </CardHeader>
       
       <CardContent className="space-y-4">
+        {/* Basic Filters */}
         <div className="space-y-3">
           <div>
             <Label htmlFor="challenge-rating" className="text-sm font-medium text-slate-700">
@@ -158,6 +209,101 @@ const GenerationControls = ({ onGenerate, isGenerating }) => {
 
         <Separator />
 
+        {/* Advanced Settings */}
+        <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
+          <CollapsibleTrigger asChild>
+            <Button variant="outline" className="w-full justify-between">
+              <div className="flex items-center gap-2">
+                <Settings className="w-4 h-4" />
+                Advanced Settings
+              </div>
+              {showAdvanced ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="space-y-3 mt-3">
+            <div>
+              <Label className="text-sm font-medium text-slate-700">
+                Generation Algorithm
+              </Label>
+              <Select value={advancedSettings.algorithm} onValueChange={(value) => handleAdvancedChange('algorithm', value)}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {algorithms.map((algo) => (
+                    <SelectItem key={algo.value} value={algo.value}>
+                      <div>
+                        <div className="font-medium">{algo.label}</div>
+                        <div className="text-xs text-slate-500">{algo.description}</div>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label className="text-sm font-medium text-slate-700">
+                Complexity Level
+              </Label>
+              <Select value={advancedSettings.complexity} onValueChange={(value) => handleAdvancedChange('complexity', value)}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {complexityLevels.map((level) => (
+                    <SelectItem key={level.value} value={level.value}>
+                      <div>
+                        <div className="font-medium">{level.label}</div>
+                        <div className="text-xs text-slate-500">{level.description}</div>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Coins className="w-4 h-4 text-amber-600" />
+                  <Label className="text-sm font-medium text-slate-700">
+                    Include Treasure
+                  </Label>
+                </div>
+                <Switch
+                  checked={advancedSettings.includeTreasure}
+                  onCheckedChange={(checked) => handleAdvancedChange('includeTreasure', checked)}
+                />
+              </div>
+              <p className="text-xs text-slate-500 ml-6">
+                Generate coin hoards, gems, and magic items
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Home className="w-4 h-4 text-emerald-600" />
+                  <Label className="text-sm font-medium text-slate-700">
+                    Include Lair
+                  </Label>
+                </div>
+                <Switch
+                  checked={advancedSettings.includeLair}
+                  onCheckedChange={(checked) => handleAdvancedChange('includeLair', checked)}
+                />
+              </div>
+              <p className="text-xs text-slate-500 ml-6">
+                Generate detailed lair descriptions and defenses
+              </p>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+
+        <Separator />
+
+        {/* Action Buttons */}
         <div className="space-y-2">
           <Button 
             onClick={handleGenerate}
@@ -177,6 +323,35 @@ const GenerationControls = ({ onGenerate, isGenerating }) => {
             <Shuffle className="w-4 h-4 mr-2" />
             Random Everything
           </Button>
+        </div>
+
+        {/* Quick Presets */}
+        <div className="pt-2">
+          <Label className="text-xs font-medium text-slate-600 mb-2 block">Quick Presets:</Label>
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setFilters({ challengeRating: '1', type: 'humanoid', environment: 'dungeon', count: 1 });
+                setAdvancedSettings({ ...advancedSettings, complexity: 'simple' });
+              }}
+              className="text-xs"
+            >
+              Dungeon Dweller
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setFilters({ challengeRating: '6+', type: 'dragon', environment: 'mountain', count: 1 });
+                setAdvancedSettings({ ...advancedSettings, complexity: 'complex', includeTreasure: true });
+              }}
+              className="text-xs"
+            >
+              Ancient Wyrm
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>
