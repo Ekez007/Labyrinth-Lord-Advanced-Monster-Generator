@@ -1,6 +1,6 @@
 import random
 from typing import List, Dict
-from ..models.monster import LairInfo
+from models.monster import LairInfo
 
 class LairGenerator:
     
