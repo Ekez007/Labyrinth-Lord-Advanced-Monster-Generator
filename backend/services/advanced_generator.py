@@ -200,7 +200,7 @@ class AdvancedMonsterGenerator:
                 monster_data["specialAbilities"]
             )
         else:
-            from ..models.monster import LairInfo
+            from models.monster import LairInfo
             lair = LairInfo(description="No fixed lair", terrain=monster_data["environment"], size="none", defenses=[])
         
         return Monster(
